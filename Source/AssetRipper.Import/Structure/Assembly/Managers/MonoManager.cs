@@ -27,7 +27,14 @@ public sealed class MonoManager : BaseManager
 				}
 				else
 				{
-					Load(assemblyPath, gameStructure.FileSystem);
+					try
+					{
+						Load(assemblyPath, gameStructure.FileSystem);
+					}
+					catch (ArgumentException ex) when (ex.Message.Contains("Invalid or unsupported runtime version", StringComparison.Ordinal))
+					{
+						Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly runtime '{assemblyName}': {ex.Message}");
+					}
 				}
 			}
 			catch (BadImageFormatException)
