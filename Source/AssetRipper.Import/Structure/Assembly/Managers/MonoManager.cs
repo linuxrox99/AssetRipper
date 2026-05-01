@@ -31,9 +31,9 @@ public sealed class MonoManager : BaseManager
 					{
 						Load(assemblyPath, gameStructure.FileSystem);
 					}
-					catch (ArgumentException ex) when (ex.Message.Contains("Invalid or unsupported runtime version", StringComparison.Ordinal))
+					catch (ArgumentException ex)
 					{
-						Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly runtime '{assemblyName}': {ex.Message}");
+						Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
 					}
 				}
 			}
