@@ -1,4 +1,5 @@
 using AsmResolver.PE.File;
+using AsmResolver.DotNet;
 using AssetRipper.Import.Logging;
 using AssetRipper.Import.Structure.Platforms;
 using AssetRipper.IO.Files;
@@ -41,7 +42,14 @@ public sealed class MonoManager : BaseManager
 						}
 						else
 						{
-							Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
+							if (assemblyName.Equals("UnityEngine.dll", StringComparison.Ordinal) && TryInjectUnityEngineStub())
+							{
+								Logger.Warning(LogCategory.Import, "Loaded fallback UnityEngine stub assembly for Windows Phone compatibility.");
+							}
+							else
+							{
+								Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
+							}
 						}
 					}
 				}
@@ -50,6 +58,33 @@ public sealed class MonoManager : BaseManager
 			{
 				Logger.Info(LogCategory.Import, $"Skipping non-PE file: {assemblyName}");
 			}
+		}
+	}
+
+	private bool TryInjectUnityEngineStub()
+	{
+		if (IsAssemblyLoaded("UnityEngine"))
+		{
+			return true;
+		}
+
+		try
+		{
+			AssemblyDefinition assembly = new("UnityEngine", new Version(0, 0, 0, 0));
+			ModuleDefinition module = new("UnityEngine", KnownCorLibs.SystemRuntime_v10_0_0_0);
+			assembly.Modules.Add(module);
+
+			module.TopLevelTypes.Add(new TypeDefinition("UnityEngine", "Object", TypeAttributes.Public | TypeAttributes.Class));
+			module.TopLevelTypes.Add(new TypeDefinition("UnityEngine", "Component", TypeAttributes.Public | TypeAttributes.Class));
+			module.TopLevelTypes.Add(new TypeDefinition("UnityEngine", "Behaviour", TypeAttributes.Public | TypeAttributes.Class));
+			module.TopLevelTypes.Add(new TypeDefinition("UnityEngine", "MonoBehaviour", TypeAttributes.Public | TypeAttributes.Class));
+
+			Add(assembly);
+			return true;
+		}
+		catch
+		{
+			return false;
 		}
 	}
 
