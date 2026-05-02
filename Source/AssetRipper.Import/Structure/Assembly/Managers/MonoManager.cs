@@ -67,7 +67,9 @@ public sealed class MonoManager : BaseManager
 		bool patchedVersion255 = ReplaceUtf8(data, "v255.255", "v4.0.303")
 			| ReplaceUtf8(data, "255.255", "4.0.303")
 			| ReplaceUtf16Le(data, "v255.255", "v4.0.303")
-			| ReplaceUtf16Le(data, "255.255", "4.0.303");
+			| ReplaceUtf16Le(data, "255.255", "4.0.303")
+			| ReplaceWithPaddingUtf8(data, "255.255.255.255", "4.0.0.0")
+			| ReplaceWithPaddingUtf16Le(data, "255.255.255.255", "4.0.0.0");
 
 		if (!patchedFramework && !patchedVersion255)
 		{
@@ -131,6 +133,40 @@ public sealed class MonoManager : BaseManager
 			}
 
 			newBytes.CopyTo(buffer, i);
+			replaced = true;
+			i += oldBytes.Length - 1;
+		}
+		return replaced;
+	}
+
+
+	private static bool ReplaceWithPaddingUtf8(byte[] buffer, string oldValue, string newValue)
+	{
+		return ReplaceWithPadding(buffer, Encoding.UTF8.GetBytes(oldValue), Encoding.UTF8.GetBytes(newValue));
+	}
+
+	private static bool ReplaceWithPaddingUtf16Le(byte[] buffer, string oldValue, string newValue)
+	{
+		return ReplaceWithPadding(buffer, Encoding.Unicode.GetBytes(oldValue), Encoding.Unicode.GetBytes(newValue));
+	}
+
+	private static bool ReplaceWithPadding(byte[] buffer, byte[] oldBytes, byte[] newBytes)
+	{
+		if (newBytes.Length > oldBytes.Length)
+		{
+			return false;
+		}
+
+		bool replaced = false;
+		for (int i = 0; i <= buffer.Length - oldBytes.Length; i++)
+		{
+			if (!buffer.AsSpan(i, oldBytes.Length).SequenceEqual(oldBytes))
+			{
+				continue;
+			}
+
+			newBytes.CopyTo(buffer, i);
+			buffer.AsSpan(i + newBytes.Length, oldBytes.Length - newBytes.Length).Clear();
 			replaced = true;
 			i += oldBytes.Length - 1;
 		}
