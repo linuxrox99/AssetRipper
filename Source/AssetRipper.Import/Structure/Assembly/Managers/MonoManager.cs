@@ -74,6 +74,11 @@ public sealed class MonoManager : BaseManager
 			markerCount += CountUtf16Le(data, "255.255.255.255");
 			markerCount += CountUtf16Le(data, "WindowsPhone,Version=v8.0");
 
+			markerCount += CountUtf8(data, "WindowsRuntime 255.255");
+			markerCount += CountUtf16Le(data, "WindowsRuntime 255.255");
+			markerCount += CountUtf8(data, ".NETCoreApp,Version=v255.255");
+			markerCount += CountUtf16Le(data, ".NETCoreApp,Version=v255.255");
+
 			Logger.Warning(LogCategory.Import, $"UnityEngine diagnostics: size={data.Length} bytes, markerHits={markerCount}, parseError={rootException.Message}");
 		}
 		catch (Exception diagException)
@@ -116,7 +121,11 @@ public sealed class MonoManager : BaseManager
 			| ReplaceUtf16Le(data, "v255.255", "v4.0.303")
 			| ReplaceUtf16Le(data, "255.255", "4.0.303")
 			| ReplaceWithPaddingUtf8(data, "255.255.255.255", "4.0.0.0")
-			| ReplaceWithPaddingUtf16Le(data, "255.255.255.255", "4.0.0.0");
+			| ReplaceWithPaddingUtf16Le(data, "255.255.255.255", "4.0.0.0")
+			| ReplaceWithPaddingUtf8(data, "WindowsRuntime 255.255", "v4.0.30319")
+			| ReplaceWithPaddingUtf16Le(data, "WindowsRuntime 255.255", "v4.0.30319")
+			| ReplaceWithPaddingUtf8(data, ".NETCoreApp,Version=v255.255", ".NETFramework,Version=4.0")
+			| ReplaceWithPaddingUtf16Le(data, ".NETCoreApp,Version=v255.255", ".NETFramework,Version=4.0");
 
 		if (!patchedFramework && !patchedVersion255)
 		{
