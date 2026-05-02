@@ -102,7 +102,7 @@ public sealed class MonoManager : BaseManager
 			}
 			int start = Math.Max(0, i - 24);
 			int len = Math.Min(96, data.Length - start);
-			string preview = Encoding.UTF8.GetString(data, start, len).Replace("\0", "\␀");
+			string preview = Encoding.UTF8.GetString(data, start, len).Replace("\0", "\\0");
 			Logger.Warning(LogCategory.Import, $"UnityEngine marker preview [{marker}]: {preview}");
 			return;
 		}
