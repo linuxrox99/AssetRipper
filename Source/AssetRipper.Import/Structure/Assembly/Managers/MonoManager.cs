@@ -65,7 +65,9 @@ public sealed class MonoManager : BaseManager
 
 		bool patchedFramework = ReplaceUtf8(data, "WindowsPhone,Version=v8.0", ".NETFramework,Version=4.0");
 		bool patchedVersion255 = ReplaceUtf8(data, "v255.255", "v4.0.303")
-			| ReplaceUtf8(data, "255.255", "4.0.303");
+			| ReplaceUtf8(data, "255.255", "4.0.303")
+			| ReplaceUtf16Le(data, "v255.255", "v4.0.303")
+			| ReplaceUtf16Le(data, "255.255", "4.0.303");
 
 		if (!patchedFramework && !patchedVersion255)
 		{
@@ -90,6 +92,31 @@ public sealed class MonoManager : BaseManager
 	{
 		byte[] oldBytes = Encoding.UTF8.GetBytes(oldValue);
 		byte[] newBytes = Encoding.UTF8.GetBytes(newValue);
+		if (oldBytes.Length != newBytes.Length)
+		{
+			return false;
+		}
+
+		bool replaced = false;
+		for (int i = 0; i <= buffer.Length - oldBytes.Length; i++)
+		{
+			if (!buffer.AsSpan(i, oldBytes.Length).SequenceEqual(oldBytes))
+			{
+				continue;
+			}
+
+			newBytes.CopyTo(buffer, i);
+			replaced = true;
+			i += oldBytes.Length - 1;
+		}
+		return replaced;
+	}
+
+
+	private static bool ReplaceUtf16Le(byte[] buffer, string oldValue, string newValue)
+	{
+		byte[] oldBytes = Encoding.Unicode.GetBytes(oldValue);
+		byte[] newBytes = Encoding.Unicode.GetBytes(newValue);
 		if (oldBytes.Length != newBytes.Length)
 		{
 			return false;
