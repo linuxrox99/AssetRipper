@@ -1,5 +1,4 @@
 using AsmResolver.PE.File;
-using AsmResolver.DotNet;
 using AssetRipper.Import.Logging;
 using AssetRipper.Import.Structure.Platforms;
 using AssetRipper.IO.Files;
@@ -42,14 +41,11 @@ public sealed class MonoManager : BaseManager
 						}
 							else
 							{
-								if (assemblyName.Equals("UnityEngine.dll", StringComparison.Ordinal) && TryInjectUnityEngineCompatibilityAssembly())
-								{
-									Logger.Warning(LogCategory.Import, "Loaded synthetic UnityEngine compatibility assembly after parser failure.");
-								}
-								else
-								{
+								if (assemblyName.Equals("UnityEngine.dll", StringComparison.Ordinal))
+									{
+										LogUnityEngineDiagnostics(assemblyPath, gameStructure.FileSystem, ex);
+									}
 									Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
-								}
 							}
 						}
 				}
@@ -61,37 +57,47 @@ public sealed class MonoManager : BaseManager
 		}
 	}
 
-	private bool TryInjectUnityEngineCompatibilityAssembly()
+	private static void LogUnityEngineDiagnostics(string assemblyPath, FileSystem fileSystem, Exception rootException)
 	{
-		if (IsAssemblyLoaded("UnityEngine"))
-		{
-			return true;
-		}
-
 		try
 		{
-			AssemblyDefinition assembly = new("UnityEngine", new Version(0, 0, 0, 0));
-			ModuleDefinition module = new("UnityEngine", KnownCorLibs.SystemRuntime_v10_0_0_0);
-			assembly.Modules.Add(module);
+			using Stream stream = fileSystem.File.OpenRead(assemblyPath);
+			using MemoryStream ms = new();
+			stream.CopyTo(ms);
+			byte[] data = ms.ToArray();
 
-			TypeDefinition objectType = new("UnityEngine", "Object", TypeAttributes.Public | TypeAttributes.Class);
-			TypeDefinition componentType = new("UnityEngine", "Component", TypeAttributes.Public | TypeAttributes.Class, objectType.ToTypeDefOrRef());
-			TypeDefinition behaviourType = new("UnityEngine", "Behaviour", TypeAttributes.Public | TypeAttributes.Class, componentType.ToTypeDefOrRef());
-			TypeDefinition monoBehaviourType = new("UnityEngine", "MonoBehaviour", TypeAttributes.Public | TypeAttributes.Class, behaviourType.ToTypeDefOrRef());
+			int markerCount = 0;
+			markerCount += CountUtf8(data, "255.255");
+			markerCount += CountUtf8(data, "255.255.255.255");
+			markerCount += CountUtf8(data, "WindowsPhone,Version=v8.0");
+			markerCount += CountUtf16Le(data, "255.255");
+			markerCount += CountUtf16Le(data, "255.255.255.255");
+			markerCount += CountUtf16Le(data, "WindowsPhone,Version=v8.0");
 
-			module.TopLevelTypes.Add(objectType);
-			module.TopLevelTypes.Add(componentType);
-			module.TopLevelTypes.Add(behaviourType);
-			module.TopLevelTypes.Add(monoBehaviourType);
-
-			Add(assembly);
-			return true;
+			Logger.Warning(LogCategory.Import, $"UnityEngine diagnostics: size={data.Length} bytes, markerHits={markerCount}, parseError={rootException.Message}");
 		}
-		catch (Exception ex)
+		catch (Exception diagException)
 		{
-			Logger.Warning(LogCategory.Import, $"UnityEngine compatibility assembly injection failed: {ex.Message}");
-			return false;
+			Logger.Warning(LogCategory.Import, $"UnityEngine diagnostics failed: {diagException.Message}");
 		}
+	}
+
+	private static int CountUtf8(byte[] buffer, string value) => CountPattern(buffer, Encoding.UTF8.GetBytes(value));
+
+	private static int CountUtf16Le(byte[] buffer, string value) => CountPattern(buffer, Encoding.Unicode.GetBytes(value));
+
+	private static int CountPattern(byte[] buffer, byte[] pattern)
+	{
+		int count = 0;
+		for (int i = 0; i <= buffer.Length - pattern.Length; i++)
+		{
+			if (buffer.AsSpan(i, pattern.Length).SequenceEqual(pattern))
+			{
+				count++;
+				i += pattern.Length - 1;
+			}
+		}
+		return count;
 	}
 
 	private bool TryLoadWithWindowsPhoneMetadataCompatibility(string assemblyName, string assemblyPath, FileSystem fileSystem, [NotNullWhen(true)] out string? message)
