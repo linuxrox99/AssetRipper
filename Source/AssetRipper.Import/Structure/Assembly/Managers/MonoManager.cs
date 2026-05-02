@@ -1,4 +1,5 @@
 using AsmResolver.PE.File;
+using AsmResolver.DotNet;
 using AssetRipper.Import.Logging;
 using AssetRipper.Import.Structure.Platforms;
 using AssetRipper.IO.Files;
@@ -39,17 +40,57 @@ public sealed class MonoManager : BaseManager
 						{
 							Logger.Warning(LogCategory.Import, $"Loaded managed assembly '{assemblyName}' using Windows Phone metadata compatibility mode. {compatibilityMessage}");
 						}
-						else
-						{
-							Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
+							else
+							{
+								if (assemblyName.Equals("UnityEngine.dll", StringComparison.Ordinal) && TryInjectUnityEngineCompatibilityAssembly())
+								{
+									Logger.Warning(LogCategory.Import, "Loaded synthetic UnityEngine compatibility assembly after parser failure.");
+								}
+								else
+								{
+									Logger.Warning(LogCategory.Import, $"Skipping unsupported managed assembly '{assemblyName}': {ex.Message}");
+								}
+							}
 						}
-					}
 				}
 			}
 			catch (BadImageFormatException)
 			{
 				Logger.Info(LogCategory.Import, $"Skipping non-PE file: {assemblyName}");
 			}
+		}
+	}
+
+	private bool TryInjectUnityEngineCompatibilityAssembly()
+	{
+		if (IsAssemblyLoaded("UnityEngine"))
+		{
+			return true;
+		}
+
+		try
+		{
+			AssemblyDefinition assembly = new("UnityEngine", new Version(0, 0, 0, 0));
+			ModuleDefinition module = new("UnityEngine", KnownCorLibs.SystemRuntime_v10_0_0_0);
+			assembly.Modules.Add(module);
+
+			TypeDefinition objectType = new("UnityEngine", "Object", TypeAttributes.Public | TypeAttributes.Class);
+			TypeDefinition componentType = new("UnityEngine", "Component", TypeAttributes.Public | TypeAttributes.Class, objectType.ToTypeDefOrRef());
+			TypeDefinition behaviourType = new("UnityEngine", "Behaviour", TypeAttributes.Public | TypeAttributes.Class, componentType.ToTypeDefOrRef());
+			TypeDefinition monoBehaviourType = new("UnityEngine", "MonoBehaviour", TypeAttributes.Public | TypeAttributes.Class, behaviourType.ToTypeDefOrRef());
+
+			module.TopLevelTypes.Add(objectType);
+			module.TopLevelTypes.Add(componentType);
+			module.TopLevelTypes.Add(behaviourType);
+			module.TopLevelTypes.Add(monoBehaviourType);
+
+			Add(assembly);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.Warning(LogCategory.Import, $"UnityEngine compatibility assembly injection failed: {ex.Message}");
+			return false;
 		}
 	}
 
