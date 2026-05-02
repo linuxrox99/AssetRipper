@@ -80,10 +80,31 @@ public sealed class MonoManager : BaseManager
 			markerCount += CountUtf16Le(data, ".NETCoreApp,Version=v255.255");
 
 			Logger.Warning(LogCategory.Import, $"UnityEngine diagnostics: size={data.Length} bytes, markerHits={markerCount}, parseError={rootException.Message}");
+			LogMarkerPreview(data, "255.255");
+			LogMarkerPreview(data, "WindowsRuntime");
+			LogMarkerPreview(data, ".NETCoreApp,Version=");
+
 		}
 		catch (Exception diagException)
 		{
 			Logger.Warning(LogCategory.Import, $"UnityEngine diagnostics failed: {diagException.Message}");
+		}
+	}
+
+	private static void LogMarkerPreview(byte[] data, string marker)
+	{
+		byte[] markerBytes = Encoding.UTF8.GetBytes(marker);
+		for (int i = 0; i <= data.Length - markerBytes.Length; i++)
+		{
+			if (!data.AsSpan(i, markerBytes.Length).SequenceEqual(markerBytes))
+			{
+				continue;
+			}
+			int start = Math.Max(0, i - 24);
+			int len = Math.Min(96, data.Length - start);
+			string preview = Encoding.UTF8.GetString(data, start, len).Replace("\0", "\␀");
+			Logger.Warning(LogCategory.Import, $"UnityEngine marker preview [{marker}]: {preview}");
+			return;
 		}
 	}
 
