@@ -64,7 +64,8 @@ public sealed class MonoManager : BaseManager
 		}
 
 		bool patchedFramework = ReplaceUtf8(data, "WindowsPhone,Version=v8.0", ".NETFramework,Version=4.0");
-		bool patchedVersion255 = ReplaceUtf8(data, "v255.255", "v4.0.303");
+		bool patchedVersion255 = ReplaceUtf8(data, "v255.255", "v4.0.303")
+			| ReplaceUtf8(data, "255.255", "4.0.303");
 
 		if (!patchedFramework && !patchedVersion255)
 		{
